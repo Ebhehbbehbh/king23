@@ -1,104 +1,40 @@
 const express = require('express');
 const axios = require('axios');
-const multer = require('multer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
-// الإعدادات
-const config = {
-    telegram: {
-        botToken: "8227860247:AAGW3xQpBERsShH-Rdva1eUu-h37ryDFsAs",
-        chatId: "7604667042"
-    }
-};
+// ⚙️ الإعدادات - ضع توكنك وأيديك هنا
+const BOT_TOKEN = "8227860247:AAGW3xQpBERsShH-Rdva1eUu-h37ryDFsAs";
+const CHAT_ID = "7604667042";
 
-// middleware
+// 📦 middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// تخزين الملفات المؤقت
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-// 📨 إرسال رسالة للتلجرام
-async function sendTelegramMessage(message) {
+// 🔔 دالة إرسال رسالة للتلجرام
+async function sendTelegramMessage(chatId, text) {
     try {
-        const url = `https://api.telegram.org/bot${config.telegram.botToken}/sendMessage`;
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
         const response = await axios.post(url, {
-            chat_id: config.telegram.chatId,
-            text: message,
+            chat_id: chatId,
+            text: text,
             parse_mode: 'HTML'
         });
-        console.log('📨 تم إرسال الرسالة للتلجرام');
+        console.log('✅ تم إرسال رسالة للتلجرام');
         return response.data;
     } catch (error) {
         console.error('❌ خطأ في إرسال الرسالة:', error.message);
     }
 }
 
-// 📤 استقبال الملفات من التطبيق
-app.post('/api/upload', upload.single('media'), async (req, res) => {
-    try {
-        const { deviceId, mediaType } = req.body;
-        const file = req.file;
-
-        if (!file) {
-            return res.status(400).json({ error: 'لا يوجد ملف' });
-        }
-
-        console.log(`📱 استقبال ملف من الجهاز: ${deviceId}`);
-
-        // إرسال إشعار للتلجرام
-        const message = `🆕 <b>تم استقبال ملف جديد</b>\n\n📱 الجهاز: <code>${deviceId}</code>\n📊 النوع: ${mediaType || 'صورة'}\n📦 الحجم: ${(file.size / 1024 / 1024).toFixed(2)} MB\n⏰ الوقت: ${new Date().toLocaleString()}`;
-        
-        await sendTelegramMessage(message);
-
-        res.json({ 
-            success: true, 
-            message: 'تم استقبال الملف بنجاح',
-            fileInfo: {
-                originalName: file.originalname,
-                size: file.size,
-                timestamp: new Date().toISOString()
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في رفع الملف:', error);
-        res.status(500).json({ error: 'خطأ في الخادم' });
-    }
-});
-
-// 📊 استقبال حالة الجهاز من التطبيق
-app.post('/api/status', async (req, res) => {
-    try {
-        const { deviceId, status, info } = req.body;
-
-        console.log(`📊 حالة الجهاز: ${deviceId} - ${status}`);
-
-        // إرسال إشعار حالة للتلجرام
-        const message = `📊 <b>تقرير حالة الجهاز</b>\n\n📱 الجهاز: <code>${deviceId}</code>\n🟢 الحالة: ${status}\n📝 المعلومات: ${info || 'لا توجد معلومات إضافية'}\n⏰ الوقت: ${new Date().toLocaleString()}`;
-        
-        await sendTelegramMessage(message);
-
-        res.json({ 
-            success: true, 
-            message: 'تم استقبال الحالة بنجاح' 
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في استقبال الحالة:', error);
-        res.status(500).json({ error: 'خطأ في الخادم' });
-    }
-});
-
-// 🎯 استقبال أوامر من التلجرام (Webhook)
+// 🎯 ويب هوك التلجرام - مهم!
 app.post('/webhook/telegram', async (req, res) => {
+    console.log('📨 استقبال webhook:', JSON.stringify(req.body));
+    
     try {
         const { message } = req.body;
         
@@ -106,40 +42,115 @@ app.post('/webhook/telegram', async (req, res) => {
             const chatId = message.chat.id;
             const text = message.text;
 
-            console.log(`🤖 رسالة من التلجرام: ${text}`);
+            console.log(`🤖 رسالة من ${chatId}: ${text}`);
 
-            // الرد على الأوامر
+            // الرد على /start
             if (text === '/start') {
-                await sendTelegramMessage('🚀 <b>بدأ البوت بالعمل!</b>\n\n✅ السيرفر يعمل بشكل صحيح\n📱 جاهز لاستقبال البيانات من التطبيقات');
+                await sendTelegramMessage(chatId, 
+                    '🚀 <b>تم توصيل البوت بنجاح!</b>\n\n' +
+                    '✅ السيرفر يعمل بشكل صحيح\n' +
+                    '📱 جاهز لاستقبال البيانات\n' +
+                    '🔗 الرابط: https://king23.onrender.com'
+                );
+            }
+            
+            // الرد على /test
+            if (text === '/test') {
+                await sendTelegramMessage(chatId, 
+                    '🧪 <b>اختبار الاتصال</b>\n\n' +
+                    '✅ البوت متصل بالسيرفر\n' +
+                    '📡 جميع الأنظمة تعمل\n' +
+                    '⏰ الوقت: ' + new Date().toLocaleString()
+                );
+            }
+            
+            // الرد على أي رسالة
+            if (text !== '/start' && text !== '/test') {
+                await sendTelegramMessage(chatId, 
+                    '📝 <b>تم استقبال رسالتك</b>\n\n' +
+                    `📩 الرسالة: ${text}\n` +
+                    '✅ تم المعالجة بنجاح'
+                );
             }
         }
 
-        res.json({ ok: true });
+        res.json({ ok: true, message: "Webhook processed" });
     } catch (error) {
         console.error('❌ خطأ في webhook:', error);
+        res.status(200).json({ ok: true }); // دائماً رد بـ 200
+    }
+});
+
+// 📤 استقبال بيانات من التطبيق
+app.post('/api/upload', async (req, res) => {
+    try {
+        const { deviceId, mediaType, data } = req.body;
+        
+        console.log(`📱 استقبال بيانات من: ${deviceId}`);
+        
+        // إرسال إشعار للتلجرام
+        await sendTelegramMessage(CHAT_ID,
+            '🆕 <b>بيانات جديدة من التطبيق</b>\n\n' +
+            `📱 الجهاز: ${deviceId}\n` +
+            `📊 النوع: ${mediaType || 'غير محدد'}\n` +
+            `⏰ الوقت: ${new Date().toLocaleString()}\n` +
+            `📦 الحجم: ${data ? data.length : 0} bytes`
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'تم استقبال البيانات',
+            received: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ خطأ في api/upload:', error);
         res.status(500).json({ error: 'خطأ في الخادم' });
     }
 });
 
-// 📍 صفحة الاختبار
+// 📊 صفحة الاختبار الرئيسية
 app.get('/', (req, res) => {
     res.json({ 
-        message: '🚀 السيرفر يعمل بنجاح!',
+        status: '✅ يعمل',
+        message: '🚀 سيرفر التلجرام يعمل بنجاح',
+        timestamp: new Date().toISOString(),
         endpoints: {
+            webhook: 'POST /webhook/telegram',
             upload: 'POST /api/upload',
-            status: 'POST /api/status',
-            webhook: 'POST /webhook/telegram'
+            test: 'GET /test'
         },
-        config: {
-            botToken: config.telegram.botToken ? '✅ مضبوط' : '❌ غير موجود',
-            chatId: config.telegram.chatId ? '✅ مضبوط' : '❌ غير موجود'
+        bot: {
+            token: BOT_TOKEN ? '✅ مضبوط' : '❌ مفقود',
+            chatId: CHAT_ID ? '✅ مضبوط' : '❌ مفقود'
         }
     });
 });
 
-// ▶️ تشغيل السيرفر
+// 🧪 صفحة اختبار إضافية
+app.get('/test', (req, res) => {
+    res.json({ 
+        test: 'نجح',
+        server: 'يعمل',
+        time: new Date().toLocaleString()
+    });
+});
+
+// ▶️ بدء السيرفر
 app.listen(PORT, () => {
-    console.log(`🚀 السيرفر يعمل على PORT: ${PORT}`);
-    console.log(`📧 البوت التوكن: ${config.telegram.botToken ? '✅ مضبوط' : '❌ غير موجود'}`);
-    console.log(`👤 الأيدي: ${config.telegram.chatId ? '✅ مضبوط' : '❌ غير موجود'}`);
+    console.log('🚀 =================================');
+    console.log('🚀 سيرفر التلجرام يعمل بنجاح!');
+    console.log(`🚀 PORT: ${PORT}`);
+    console.log(`🔗 الرابط: https://king23.onrender.com`);
+    console.log(`🤖 البوت: ${BOT_TOKEN ? '✅ متصل' : '❌ غير متصل'}`);
+    console.log(`👤 الأيدي: ${CHAT_ID}`);
+    console.log('🚀 =================================');
+    
+    // إرسال رسالة بدء التشغيل
+    sendTelegramMessage(CHAT_ID, 
+        '🟢 <b>بدء تشغيل السيرفر</b>\n\n' +
+        '✅ السيرفر يعمل الآن\n' +
+        `🔗 الرابط: https://king23.onrender.com\n` +
+        `⏰ الوقت: ${new Date().toLocaleString()}`
+    );
 });
